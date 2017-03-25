@@ -1,0 +1,102 @@
+//    Set of functions for Truss Matrix Analysis on the HP Prime
+//    Copyright (C) 2017  Ricard Lado
+
+//    This program is free software: you can redistribute it and/or modify
+//    it under the terms of the GNU General Public License as published by
+//    the Free Software Foundation, either version 3 of the License, or
+//    (at your option) any later version.
+
+//    This program is distributed in the hope that it will be useful,
+//    but WITHOUT ANY WARRANTY; without even the implied warranty of
+//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//    GNU General Public License for more details.
+
+//    You should have received a copy of the GNU General Public License
+//    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+EXPORT ensamble_mat(m,position,dimension)
+BEGIN
+  local ME;
+  local i,j;
+  ME:=MAKEMAT(0,dimension,dimension);
+  FOR i FROM 1 TO rowDim(m) DO
+    FOR j FROM 1 TO colDim(m) DO
+      ME[position[i],position[j]]:=m[i,j];     
+    END;
+  END;
+  return ME;
+END;
+
+EXPORT kd2(Lx,Ly,ael) //ael = AE/L
+BEGIN
+  return [[Lx,0],[Ly,0],[0,Lx],[0,Ly]]*ael*[[1,-1],[-1,1]]*[[Lx,Ly,0,0],[0,0,Lx,Ly]];
+END;
+
+EXPORT cLt(n,f) //[near] [far]
+BEGIN
+  local L,Lx,Ly;  
+  L:=((f[1]-n[1])^2+(f[2]-n[2])^2)^(1/2);
+  Lx:=(f[1]-n[1])/L;
+  Ly:=(f[2]-n[2])/L;
+  return [Lx,Ly,L];
+END;
+
+genCoord(dimension)
+BEGIN
+  local cv,i,j;
+  cv:=[[1,2]];
+  j:=2;
+  FOR i FROM 3 TO 2*dimension STEP 2 DO
+    cv:=ADDROW(cv,[i,i+1],j);
+    j:=j+1;
+  END;
+  return cv;
+END;
+
+EXPORT buildStiffness(nodesCoord,elementNodes)
+BEGIN
+  local cv,k,ki,dimension,c,lxlyl,position,i;
+  local aux;
+  dimension:=rowDim(nodesCoord);  
+  cv:=genCoord(dimension);
+  k:=MAKEMAT(0,dimension*2,dimension*2);
+  FOR i FROM 1 TO rowDim(elementNodes) DO
+    c:=elementNodes[i];  
+    lxlyl:=cLt(nodesCoord[c[1]],nodesCoord[c[2]]);
+    position:=cv[c[1]];    
+    aux:=cv[c[2]];
+    position:=append(position,aux[1]);  
+    position:=append(position,aux[2]);  
+    ki:=kd2(lxlyl[1],lxlyl[2],1/lxlyl[3]); //*AE
+    k:=k+ensamble_mat(ki,position,dimension*2);
+  END;
+  return k;
+END;
+
+EXPORT buildStiffnessVERBOSE(nodesCoord,elementNodes)
+BEGIN
+  local cv,k,ki,dimension,c,lxlyl,position,i;
+  local aux;
+  dimension:=rowDim(nodesCoord);  
+  cv:=genCoord(dimension);
+  k:=MAKEMAT(0,dimension*2,dimension*2);
+  FOR i FROM 1 TO rowDim(elementNodes) DO
+    c:=elementNodes[i];  
+    lxlyl:=cLt(nodesCoord[c[1]],nodesCoord[c[2]]);
+    MSGBOX("LAMBDA X,Y,L");
+    MSGBOX(lxlyl);
+    position:=cv[c[1]];    
+    aux:=cv[c[2]];
+    position:=append(position,aux[1]);  
+    position:=append(position,aux[2]);  
+    MSGBOX("POSITION:");
+    MSGBOX(position);
+    ki:=kd2(lxlyl[1],lxlyl[2],1/lxlyl[3]); //*AE
+    MSGBOX("KI:");
+    MSGBOX(ki);
+    k:=k+ensamble_mat(ki,position,dimension*2);
+    MSGBOX("K:");
+    MSGBOX(k);
+  END;
+  return k;
+END;
