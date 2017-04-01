@@ -14,7 +14,23 @@
 //    You should have received a copy of the GNU General Public License
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-EXPORT ensamble_mat(m,position,dimension)
+
+//Support functions
+EXPORT cLt(n,f) //[near] [far]
+BEGIN
+  local L,Lx,Ly;  
+  L:=((f[1]-n[1])^2+(f[2]-n[2])^2)^(1/2);
+  Lx:=(f[1]-n[1])/L;
+  Ly:=(f[2]-n[2])/L;
+  return [Lx,Ly,L];
+END;
+
+EXPORT kd2(Lx,Ly,ael) //ael = AE/L
+BEGIN
+  return [[Lx,0],[Ly,0],[0,Lx],[0,Ly]]*ael*[[1,-1],[-1,1]]*[[Lx,Ly,0,0],[0,0,Lx,Ly]];
+END;
+
+EXPORT ensemble_mat(m,position,dimension)
 BEGIN
   local ME;
   local i,j;
@@ -25,20 +41,6 @@ BEGIN
     END;
   END;
   return ME;
-END;
-
-EXPORT kd2(Lx,Ly,ael) //ael = AE/L
-BEGIN
-  return [[Lx,0],[Ly,0],[0,Lx],[0,Ly]]*ael*[[1,-1],[-1,1]]*[[Lx,Ly,0,0],[0,0,Lx,Ly]];
-END;
-
-EXPORT cLt(n,f) //[near] [far]
-BEGIN
-  local L,Lx,Ly;  
-  L:=((f[1]-n[1])^2+(f[2]-n[2])^2)^(1/2);
-  Lx:=(f[1]-n[1])/L;
-  Ly:=(f[2]-n[2])/L;
-  return [Lx,Ly,L];
 END;
 
 genCoord(dimension)
@@ -52,6 +54,8 @@ BEGIN
   END;
   return cv;
 END;
+
+//Important functions
 
 EXPORT buildStiffness(nodesCoord,elementNodes)
 BEGIN
@@ -68,7 +72,7 @@ BEGIN
     position:=append(position,aux[1]);  
     position:=append(position,aux[2]);  
     ki:=kd2(lxlyl[1],lxlyl[2],1/lxlyl[3]); //*AE
-    k:=k+ensamble_mat(ki,position,dimension*2);
+    k:=k+ensemble_mat(ki,position,dimension*2);
   END;
   return k;
 END;
@@ -94,9 +98,60 @@ BEGIN
     ki:=kd2(lxlyl[1],lxlyl[2],1/lxlyl[3]); //*AE
     MSGBOX("KI:");
     MSGBOX(ki);
-    k:=k+ensamble_mat(ki,position,dimension*2);
+    k:=k+ensemble_mat(ki,position,dimension*2);
     MSGBOX("K:");
     MSGBOX(k);
   END;
   return k;
 END;
+
+EXPORT InternalForces(nodesCoord,elementNodes,displacements,ae) //ae= (A*E)
+BEGIN
+  local c,lxlyl,i;
+  local disp,a,b,d; //[[0],[0],[0],[0]]
+  //Step 1
+  i:=1;
+  c:=elementNodes[i];  
+  lxlyl:=cLt(nodesCoord[c[1]],nodesCoord[c[2]]);
+  a:=displacements[c[1]];
+  b:=displacements[c[2]];
+  disp:=[[a[1]],[a[2]],[b[1]],[b[2]]];  
+  d:=ae/lxlyl[3]*[[-lxlyl[1],-lxlyl[2],lxlyl[1],lxlyl[2]]]*disp;
+  
+  local intfor=d;
+  //Keep calculating
+  FOR i FROM 2 TO rowDim(elementNodes) DO
+    c:=elementNodes[i];  
+    lxlyl:=cLt(nodesCoord[c[1]],nodesCoord[c[2]]);
+	a:=displacements[c[1]];
+	b:=displacements[c[2]];
+	disp:=[[a[1]],[a[2]],[b[1]],[b[2]]];  
+	d:=ae/lxlyl[3]*[[-lxlyl[1],-lxlyl[2],lxlyl[1],lxlyl[2]]]*disp;
+    intfor:=append(intfor,d[1]);
+  END;
+  return intfor;
+END;
+
+//Help menu
+EXPORT Help()
+BEGIN
+print("#################");
+print("Welcome to the help screen:");
+print(" ");
+print("#################");
+print(" ");
+print("This section explains how to use the set of functions bundled with this program.");
+print(" ");
+print("cLt: This function returns lambda x ,y and length of a given element defined by two vectors with the near and far coordinates. Eg. cLt([0,0],[1,1])");
+print(" ");
+print("kd2: This function returns the stiffness matrix of a given element defined by it s lambda(Lx,Ly,ael) ael=A*E/L ");
+print(" ");
+print("ensemble_mat: This function ensembles a element stiffness matrix into a bigger matrix given the matrix a 4 position vector and a dimension. Eg.([[m]],[position],dimension)");
+print(" ");
+print("buildStiffness: This function is aimed at obtaining the stiffness matrix of a given set of nodes and elements. From there its easy to obtain forces and displacements by solving the equation F=K*D, with the built in CAS solver function. Eg.buildStiffness([[0,0],[0.8,0],[1.6,0],[2.4,0],[3.2,0],[2.4,2.9],[1.6,2.9],[0.8,2.9]],[[1,2],[2,3],[3,4],[4,5],[5,6],[6,7],[7,8],[1,8],[2,8],[3,6],[3,7],[3,8],[4,6]])");
+print(" ");
+print("InternalForces: Calculates internal forces of a truss structure. Requires a set of nodes,elements,displacements,A*E. This data is entered in a nx2 coord. matrix mx2 elem. matrix and a mx2 displacement matrix, plus E*A.");
+print(" ");
+END;
+
+
